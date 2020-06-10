@@ -37,12 +37,11 @@ while True:
     count = count + 1
     if count%10 != 0:
         continue
-    
+
     if not grabbed:
         break
     frame = imutils.resize(frame, width=400)
-    results = detect_people(frame, net, ln,
-                            personIdx=LABELS.index("person"))
+    results = detect_people(frame, net, ln, personIdx=LABELS.index("person"))
 
     violate = set()
 
