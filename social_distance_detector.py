@@ -32,6 +32,8 @@ vs = cv2.VideoCapture(args["input"] if args["input"] else 0)
 writer = None
 count = 0
 
+violationNum = []
+
 while True:
     (grabbed, frame) = vs.read()
     count = count + 1
@@ -73,6 +75,7 @@ while True:
     cv2.putText(frame, text, (10, frame.shape[0] - 25),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 0, 255), 1)
 
+    violationNum.append(len(violate))
     if args["display"] > 0:
         frame = imutils.resize(frame, width=700)
         cv2.imshow("Frame", frame)
@@ -90,3 +93,4 @@ while True:
 
 
 print(f"time taken = {time.time()-start}")
+np.save('ViolationCount.npy', violationNum)
