@@ -45,24 +45,25 @@ def detect(frame):
     text = "Social Distancing Violations: {}".format(len(violate))
     cv2.putText(frame, text, (10, frame.shape[0] - 25),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 0, 255), 1)
-    
+
     return frame, len(violate)
 
 
-def videoLoop(panel,vs):
+def videoLoop(panel, vs):
     while not stopEvent.is_set():
-        count = 0 
+        count = 0
         while vs.isOpened():
             (grabbed, frame) = vs.read()
             count = count + 1
-            if count%10 != 0:
+            if count % 10 != 0:
                 continue
 
             if not grabbed:
                 break
-            
-            frame, voilation = detect(frame)
-            print(voilation)
+
+            frame, violation = detect(frame)
+            print(violation)
+            violationNum.append(violation)
 
             frame = imutils.resize(frame, width=300)
             image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -70,7 +71,7 @@ def videoLoop(panel,vs):
             image = ImageTk.PhotoImage(image)
 
             if panel is None:
-                panel = Label(image=image) 
+                panel = Label(image=image)
                 panel.image = image
                 panel.pack(side="left", padx=10, pady=10)
             else:
@@ -79,12 +80,13 @@ def videoLoop(panel,vs):
 
 
 def onClose(vs):
-		print("[INFO] closing...")
-		stopEvent.set()
-		vs.release()
-		root.quit()
+    print("[INFO] closing...")
+    stopEvent.set()
+    vs.release()
+    root.quit()
 
 
+# Initialing parameters
 start = time.time()
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--input", type=str, default="",
@@ -95,7 +97,7 @@ ap.add_argument("-d", "--display", type=int, default=1,
                 help="whether or not output frame should be displayed")
 args = vars(ap.parse_args())
 
-
+# initialing Model
 labelsPath = os.path.sep.join([config.MODEL_PATH, "coco.names"])
 LABELS = open(labelsPath).read().strip().split("\n")
 weightsPath = os.path.sep.join([config.MODEL_PATH, "yolov3.weights"])
@@ -103,12 +105,11 @@ configPath = os.path.sep.join([config.MODEL_PATH, "yolov3.cfg"])
 net = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
 ln = net.getLayerNames()
 ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
-
-
+# initialising Video
+violationNum = []
 vs = cv2.VideoCapture(args["input"] if args["input"] else 0)
 
-
-
+# GUI Window Code
 thread = None
 root = Tk()
 root.configure(bg='#141414')
@@ -118,11 +119,13 @@ root.resizable(width=True, height=True)
 frame = None
 panel = None
 Label1 = Label(root, text='Social Distancing Detector')
-Label1.configure(font=("Avenir", 20),bg='#141414', fg="#FCA311" )
+Label1.configure(font=("Avenir", 20), bg='#141414', fg="#FCA311")
 Label1.pack()
 stopEvent = threading.Event()
-thread = threading.Thread(target=videoLoop, args=(panel,vs))
+thread = threading.Thread(target=videoLoop, args=(panel, vs))
 thread.start()
 root.protocol("WM_DELETE_WINDOW", lambda arg=vs: onClose(arg))
 root.mainloop()
 print(f"time taken = {time.time()-start}")
+np.save('ViolationCount1.npy', violationNum)
+print("Violation Count saved")
