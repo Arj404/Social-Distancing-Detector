@@ -147,7 +147,6 @@ def reset():
     global Label0
     global textfield
     global button1
-
     Label0.destroy()
     textfield.destroy()
     button1.destroy()
