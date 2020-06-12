@@ -42,60 +42,130 @@ def detect(frame):
         cv2.rectangle(frame, (startX, startY), (endX, endY), color, 1)
         cv2.circle(frame, (cX, cY), 3, color, 1)
 
-    text = "Social Distancing Violations: {}".format(len(violate))
-    cv2.putText(frame, text, (10, frame.shape[0] - 25),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 0, 255), 1)
+    # text = "Social Distancing Violations: {}".format(len(violate))
+    # cv2.putText(frame, text, (10, frame.shape[0] - 25),
+    #             cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 0, 255), 1)
 
     return frame, len(violate)
 
 
-def videoLoop(panel, vs):
-    while not stopEvent.is_set():
-        count = 0
-        while vs.isOpened():
-            (grabbed, frame) = vs.read()
-            count = count + 1
-            if count % 10 != 0:
-                continue
+def videoLoop(panel1, panel2, vs):
+    if vs:
+        try:
+            while not stopEvent.is_set():
+                count = 0
+                while vs.isOpened():
+                    (grabbed, frame) = vs.read()
+                    count = count + 1
+                    if count % 60 != 0:
+                        continue
 
-            if not grabbed:
-                break
+                    if not grabbed:
+                        break
 
-            frame, violation = detect(frame)
-            print(violation)
-            violationNum.append(violation)
+                    frame, violation = detect(frame)
+                    print(violation)
+                    violationNum.append(violation)
 
-            frame = imutils.resize(frame, width=300)
-            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(image)
-            image = ImageTk.PhotoImage(image)
+                    frame = imutils.resize(frame, width=700)
+                    image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    image = Image.fromarray(image)
+                    image = ImageTk.PhotoImage(image)
 
-            if panel is None:
-                panel = Label(image=image)
-                panel.image = image
-                panel.pack(side="left", padx=10, pady=10)
-            else:
-                panel.configure(image=image)
-                panel.image = image
+                    if panel1 is None:
+                        panel1 = Label(image=image)
+                        panel1.image = image
+                        panel1.grid(row=1, column=0, padx=10,
+                                    pady=10, rowspan=3, columnspan=2)
+                        # ,side="left", padx=10, pady=10
+                        panel2.configure(text=f'Violations = {violation}')
+                        panel2.text = f'Violations = {violation}'
+
+                    else:
+                        panel1.configure(image=image)
+                        panel1.image = image
+                        panel2.configure(text=f'Violations = {violation}')
+                        panel2.text = f'Violations = {violation}'
+
+                if vs.read()[0] == 0:
+                    np.save('ViolationCount1.npy', violationNum)
+                    print("Violation Count saved")
+                    panel1.destroy()
+                    panel1 = Label(text="Video Finished")
+                    panel1.text = "Video Finished"
+                    panel1.configure(font=("Avenir", 20),
+                                     bg='#141414', fg="#FCA311")
+                    panel1.grid(row=0, column=0, padx=20,
+                                pady=20, rowspan=3, columnspan=2)
+                    stopEvent.set()
+                    print("resetting")
+                    reset()
+
+        except RuntimeError as e:
+            print(f"[INFO] caught a RuntimeError: {e}")
 
 
-def onClose(vs):
-    print("[INFO] closing...")
+def onClose1(vs):
+    root.quit()
+
+
+def onClose2(vs):
     stopEvent.set()
     vs.release()
     root.quit()
 
 
-# Initialing parameters
+def onclick1():
+    path = textfield.get()
+    print(path)
+
+    if path:
+        if path == '0':
+            path = 0
+        vs = cv2.VideoCapture(path)
+        if vs is None or not vs.isOpened():
+            print('Warning: unable to open video source: ', path)
+        else:
+            root.protocol("WM_DELETE_WINDOW", lambda arg=vs: onClose2(arg))
+            global thread
+            global stopEvent
+            stopEvent = threading.Event()
+            thread = threading.Thread(
+                target=videoLoop, args=(panel1, panel2, vs))
+            thread.setDaemon(True)
+            thread.start()
+
+
+def onclick2():
+    label2 = Label(root, text='clicked')
+    label2.grid(row=4, column=1)
+
+
+def reset():
+    root.protocol("WM_DELETE_WINDOW", lambda arg=vs: onClose1(arg))
+    print("bleh")
+    global Label0
+    global textfield
+    global button1
+
+    Label0.destroy()
+    textfield.destroy()
+    button1.destroy()
+
+    Label0 = Label(root, text='Enter the File path')
+    Label0.configure(font=("Avenir", 15), bg='#141414', fg="#FCA311")
+    Label0.grid(row=2, column=0, padx=50)
+    textfield = Entry(root, width=50, bg='#FCA311', fg='#141414')
+    textfield.grid(row=2, column=1, padx=(10, 50), pady=40,)
+    textfield.insert(0, "pedestrians.mp4")
+    button1 = Button(root, text='START', padx=30, pady=5,
+                     command=onclick1)
+    button1.configure(font=("Avenir", 15), fg="#141414",
+                      highlightbackground='#FCA311', relief=GROOVE, borderwidth=.1)
+    button1.grid(row=3, column=0, columnspan=2)
+
+
 start = time.time()
-ap = argparse.ArgumentParser()
-ap.add_argument("-i", "--input", type=str, default="",
-                help="path to (optional) input video file")
-ap.add_argument("-o", "--output", type=str, default="",
-                help="path to (optional) output video file")
-ap.add_argument("-d", "--display", type=int, default=1,
-                help="whether or not output frame should be displayed")
-args = vars(ap.parse_args())
 
 # initialing Model
 labelsPath = os.path.sep.join([config.MODEL_PATH, "coco.names"])
@@ -107,25 +177,55 @@ ln = net.getLayerNames()
 ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 # initialising Video
 violationNum = []
-vs = cv2.VideoCapture(args["input"] if args["input"] else 0)
+path = None
+vs = None
+
 
 # GUI Window Code
 thread = None
+stopEvent = None
 root = Tk()
 root.configure(bg='#141414')
 root.wm_title("Social Distancing Detector")
-root.geometry("550x500")
+root.geometry("1000x500")
 root.resizable(width=True, height=True)
 frame = None
-panel = None
+panel1 = None
+Label0 = None
+
+# Initializing Video Gui
+Label0 = Label(root, text='Enter the File path')
+Label0.configure(font=("Avenir", 15), bg='#141414', fg="#FCA311")
+Label0.grid(row=1, column=0, padx=50)
+textfield = Entry(root, width=40, bg='#FCA311', fg='#141414')
+textfield.grid(row=1, column=1, padx=(10, 50), pady=30,)
+textfield.insert(0, "pedestrians.mp4")
+button1 = Button(root, text='START', padx=30, pady=5,
+                 command=onclick1)
+button1.configure(font=("Avenir", 15), fg="#141414",
+                  highlightbackground='#FCA311', relief=GROOVE, borderwidth=.1)
+button1.grid(row=2, column=0, columnspan=2)
+
+# Other Gui
+panel2 = Label(text=f'Violations = None')
+panel2.text = f'Violations = None'
+panel2.configure(font=("Avenir", 20), bg='#141414', fg="#FCA311")
+panel2.grid(row=1, column=2, padx=10, pady=10)
+
 Label1 = Label(root, text='Social Distancing Detector')
 Label1.configure(font=("Avenir", 20), bg='#141414', fg="#FCA311")
-Label1.pack()
-stopEvent = threading.Event()
-thread = threading.Thread(target=videoLoop, args=(panel, vs))
-thread.start()
-root.protocol("WM_DELETE_WINDOW", lambda arg=vs: onClose(arg))
+Label1.grid(row=0, columnspan=3)
+
+button2 = Button(root, text='Submit', padx=30, pady=5,
+                 command=onclick2)
+button2.configure(font=("Avenir", 15), fg="#141414",
+                  highlightbackground='#FCA311', relief=GROOVE, borderwidth=.1)
+button2.grid(row=3, column=2)
+
+
+root.protocol("WM_DELETE_WINDOW", lambda arg=vs: onClose1(arg))
+
+
 root.mainloop()
 print(f"time taken = {time.time()-start}")
-np.save('ViolationCount1.npy', violationNum)
-print("Violation Count saved")
+# pedestrians.mp4
