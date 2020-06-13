@@ -107,8 +107,6 @@ def videoLoop(panel1, panel2, vs):
 
 
 def Analysis():
-    #global stopEvent
-    # panel1.destroy()
     np.save('ViolationCount1.npy', violationNum)
     print("Violation Count saved")
     if stopEvent:
@@ -125,22 +123,19 @@ def Analysis():
     fig.set_size_inches(7, 4, forward=True)
     ax2.axis('equal')
 
-    heatmap, xedges, yedges = np.histogram2d(
-        np.arange(len(violationCount)), violationCount, bins=(64, 64))
-    extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
-    ax2.imshow(heatmap, extent=extent)
-
+    ax2 = plt.subplot(212)
+    ax2.boxplot(violationCount,vert=False, )
+    ax2.set(xlim=(0, 25))
+    
+    ax1 = plt.subplot(211)
     ax1.plot(np.arange(len(violationCount)), violationCount,
              color='red')
     ax1.set(xlabel='time', ylabel='no of violations')
-    plt.ylim(0, 20)
+
     panel1 = FigureCanvasTkAgg(fig, root)
     panel1.get_tk_widget().grid(row=1, column=0, padx=10,
                                 pady=10, rowspan=3, columnspan=2)
     panel1.draw()
-    # toolbar = NavigationToolbar2TkAgg(canvas, self)
-    # toolbar.update()
-    # canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
 
 def onClose1(vs):
