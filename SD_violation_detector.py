@@ -1,3 +1,6 @@
+import matplotlib.style as style
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from Detection import social_distancing_config as config
 from Detection.detection import detect_people
 from scipy.spatial import distance as dist
@@ -10,6 +13,9 @@ import time
 from tkinter import *
 from PIL import ImageTk, Image
 import threading
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use("TkAgg")
 
 
 def detect(frame):
@@ -42,10 +48,6 @@ def detect(frame):
         cv2.rectangle(frame, (startX, startY), (endX, endY), color, 1)
         cv2.circle(frame, (cX, cY), 3, color, 1)
 
-    # text = "Social Distancing Violations: {}".format(len(violate))
-    # cv2.putText(frame, text, (10, frame.shape[0] - 25),
-    #             cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 0, 255), 1)
-
     return frame, len(violate)
 
 
@@ -57,7 +59,7 @@ def videoLoop(panel1, panel2, vs):
                 while vs.isOpened():
                     (grabbed, frame) = vs.read()
                     count = count + 1
-                    if count % 60 != 0:
+                    if count % 10 != 0:
                         continue
 
                     if not grabbed:
@@ -100,9 +102,45 @@ def videoLoop(panel1, panel2, vs):
                     stopEvent.set()
                     print("resetting")
                     reset()
-
         except RuntimeError as e:
             print(f"[INFO] caught a RuntimeError: {e}")
+
+
+def Analysis():
+    #global stopEvent
+    # panel1.destroy()
+    np.save('ViolationCount1.npy', violationNum)
+    print("Violation Count saved")
+    if stopEvent:
+        stopEvent.set()
+    root.protocol("WM_DELETE_WINDOW", lambda arg=vs: onClose1(arg))
+    violationCount = np.load('./ViolationCount.npy')
+    # print(violationCount)
+
+    style.use('seaborn-whitegrid')
+    # style.use('ggplot')
+
+    fig, (ax1, ax2) = plt.subplots(nrows=2, sharex=True,
+                                   dpi=100, gridspec_kw={'height_ratios': [1, 1]})
+    fig.set_size_inches(7, 4, forward=True)
+    ax2.axis('equal')
+
+    heatmap, xedges, yedges = np.histogram2d(
+        np.arange(len(violationCount)), violationCount, bins=(64, 64))
+    extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+    ax2.imshow(heatmap, extent=extent)
+
+    ax1.plot(np.arange(len(violationCount)), violationCount,
+             color='red')
+    ax1.set(xlabel='time', ylabel='no of violations')
+    plt.ylim(0, 20)
+    panel1 = FigureCanvasTkAgg(fig, root)
+    panel1.get_tk_widget().grid(row=1, column=0, padx=10,
+                                pady=10, rowspan=3, columnspan=2)
+    panel1.draw()
+    # toolbar = NavigationToolbar2TkAgg(canvas, self)
+    # toolbar.update()
+    # canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
 
 def onClose1(vs):
@@ -118,7 +156,6 @@ def onClose2(vs):
 def onclick1():
     path = textfield.get()
     print(path)
-
     if path:
         if path == '0':
             path = 0
@@ -137,8 +174,7 @@ def onclick1():
 
 
 def onclick2():
-    label2 = Label(root, text='clicked')
-    label2.grid(row=4, column=1)
+    Analysis()
 
 
 def reset():
@@ -215,7 +251,7 @@ Label1 = Label(root, text='Social Distancing Detector')
 Label1.configure(font=("Avenir", 20), bg='#141414', fg="#FCA311")
 Label1.grid(row=0, columnspan=3)
 
-button2 = Button(root, text='Submit', padx=30, pady=5,
+button2 = Button(root, text='Analysis', padx=30, pady=5,
                  command=onclick2)
 button2.configure(font=("Avenir", 15), fg="#141414",
                   highlightbackground='#FCA311', relief=GROOVE, borderwidth=.1)
